@@ -1,0 +1,100 @@
+name: Release Theme JAR
+
+on:
+    push:
+        branches:
+            - main
+    pull_request:
+        branches:
+            - main
+    workflow_dispatch:
+
+# Read-only by default; the release job requests contents: write explicitly.
+# No deployment secrets are used anywhere in this workflow.
+permissions:
+    contents: read
+
+env:
+    NODE_VERSION: "24"
+
+jobs:
+    build:
+        name: Build theme JAR
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: ${{ env.NODE_VERSION }}
+                  cache: "npm"
+
+            # postinstall runs `keycloakify sync-extensions`, which pulls the
+            # theme UI source from the pinned npm dependency.
+            - run: npm ci
+
+            # Runs `npm run build && keycloakify build`, producing
+            # dist_keycloak/homelab-theme.jar.
+            - name: Build Keycloak theme
+              run: npm run build-keycloak-theme
+
+            - name: Upload theme JAR artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: keycloak-theme-jar
+                  path: dist_keycloak/*.jar
+                  if-no-files-found: error
+                  retention-days: 14
+
+    security_scan:
+        name: Security Scan (Trivy)
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Run Trivy vulnerability scanner
+              uses: aquasecurity/trivy-action@v0.36.0
+              with:
+                  scan-type: "fs"
+                  scan-ref: "."
+                  hide-progress: false
+                  format: "table"
+                  exit-code: "1"
+                  severity: "CRITICAL,HIGH"
+                  ignore-unfixed: true
+
+    release:
+        name: Publish latest release
+        # Release on push to main or a manual run; never on PRs.
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        needs: [build, security_scan]
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+        steps:
+            - name: Download theme JAR artifact
+              uses: actions/download-artifact@v4
+              with:
+                  name: keycloak-theme-jar
+                  path: dist
+
+            # Rolling "latest" release: the tag is moved to the current commit
+            # and the JAR asset is replaced on every run, giving a stable URL:
+            #   .../releases/latest/download/homelab-theme.jar
+            - name: Publish / update "latest" release
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: latest
+                  name: Latest theme build
+                  body: |
+                      Rolling build of the Keycloak theme JAR from the latest commit on `main`.
+
+                      Commit: ${{ github.sha }}
+
+                      Download the JAR from the assets below and install it into your
+                      Keycloak `providers/` directory. See the README for install and
+                      theming instructions.
+                  target_commitish: ${{ github.sha }}
+                  prerelease: false
+                  make_latest: true
+                  files: dist/*.jar
