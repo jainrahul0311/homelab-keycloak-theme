@@ -2,6 +2,7 @@
 
 # === Owned files start ===
 # login/i18n.ts
+# login/components/WebAuthnConditionalUi/useLogic.tsx
 # === Owned files end =====
 
 # === @oussemasahbeni/keycloakify-login-shadcn v250004.0.24 ===
@@ -59,7 +60,6 @@
 /login/components/UserProfileFormFields/TextareaTag.tsx
 /login/components/UserProfileFormFields/UserProfileFormFields.tsx
 /login/components/WebAuthnConditionalUi/index.ts
-/login/components/WebAuthnConditionalUi/useLogic.tsx
 /login/components/WebAuthnConditionalUi/WebAuthnConditionalUi.tsx
 /login/pages/code/index.ts
 /login/pages/code/Page.stories.tsx
